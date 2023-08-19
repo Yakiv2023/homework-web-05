@@ -1,0 +1,63 @@
+import aiohttp
+import asyncio
+from datetime import datetime, timedelta
+
+class ApiClient:
+    def __init__(self):
+        self.base_url = "https://api.privatbank.ua/p24api/pubinfo"
+
+    async def get_exchange_rates(self, date):
+        async with aiohttp.ClientSession() as session:
+            params = {'json': 'true', 'date': date}
+            async with session.get(self.base_url, params=params) as response:
+                data = await response.json()
+                return data
+
+class CurrencyConverter:
+    def __init__(self, data):
+        self.data = data
+
+    def get_usd_rate(self):
+        for currency in self.data:
+            if currency['ccy'] == 'USD':
+                return {'sale': float(currency['sale']), 'purchase': float(currency['buy'])}
+        return None
+
+    def get_eur_rate(self):
+        for currency in self.data:
+            if currency['ccy'] == 'EUR':
+                return {'sale': float(currency['sale']), 'purchase': float(currency['buy'])}
+        return None
+
+class ConsoleApp:
+    def __init__(self):
+        self.api_client = ApiClient()
+
+    async def run(self):
+        days = int(input("Введіть кількість днів: "))
+        today = datetime.now()
+        max_days = min(days, 10)  # Обмежуємо не більше 10 днів
+        for i in range(max_days):
+            date = (today - timedelta(days=i)).strftime('%d.%m.%Y')
+            try:
+                exchange_data = await self.api_client.get_exchange_rates(date)
+                converter = CurrencyConverter(exchange_data)
+                usd_rate = converter.get_usd_rate()
+                eur_rate = converter.get_eur_rate()
+
+                if usd_rate is not None and eur_rate is not None:
+                    result = {
+                        date: {
+                            'EUR': eur_rate,
+                            'USD': usd_rate
+                        }
+                    }
+                    print(result)
+                else:
+                    print(f"Дані для заданих валют не знайдено на {date}")
+            except Exception as e:
+                print(f"Помилка: {e}")
+
+if __name__ == "__main__":
+    app = ConsoleApp()
+    asyncio.run(app.run())
